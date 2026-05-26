@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { STREAMING_SERVICES } from '@/lib/config'
 import type { Recommendation } from '@/types/recommender'
@@ -24,6 +24,10 @@ export default function Home() {
   const [selectedGenres, setSelectedGenres] = useState<string[]>([])
   const [status, setStatus] = useState<Status>('idle')
   const [results, setResults] = useState<Recommendation[]>([])
+
+  useEffect(() => {
+    fetch('/api/warmup').catch(() => {})
+  }, [])
 
   function toggleGenre(genre: string) {
     setSelectedGenres((prev) =>
