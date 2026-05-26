@@ -68,6 +68,20 @@ function parseRatingClass(className: string): number | null {
   return match ? parseInt(match[1], 10) / 2 : null
 }
 
+// Cache inspectors — return cached data without triggering a scrape.
+// Used by route handlers that should only read from a pre-warmed cache.
+export function getCachedWatchlist(username: string): WatchlistFilm[] | null {
+  return getCached<WatchlistFilm[]>(`watchlist:${username}`)
+}
+
+export function getCachedRatings(username: string): RatedFilm[] | null {
+  return getCached<RatedFilm[]>(`ratings:${username}`)
+}
+
+export function getCachedDiary(username: string): DiaryEntry[] | null {
+  return getCached<DiaryEntry[]>(`diary:${username}`)
+}
+
 export async function fetchWatchlist(username: string): Promise<WatchlistFilm[]> {
   const cacheKey = `watchlist:${username}`
   const cached = getCached<WatchlistFilm[]>(cacheKey)

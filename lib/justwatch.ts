@@ -110,6 +110,21 @@ const SEARCH_QUERY = `
   }
 `
 
+// Cache inspector — returns offers for any of the given films that have
+// already been cached. Films not in the cache are simply absent from the map.
+// Used by route handlers that should only read from a pre-warmed cache.
+export function getCachedStreamingForFilms(
+  films: Array<{ title: string; year: number; slug: string }>,
+  country: string = DEFAULT_COUNTRY,
+): Map<string, StreamingOffer[]> {
+  const map = new Map<string, StreamingOffer[]>()
+  for (const { title, year, slug } of films) {
+    const offers = getCached(`jw:${country}:${title.toLowerCase()}:${year}`)
+    if (offers !== null) map.set(slug, offers)
+  }
+  return map
+}
+
 export async function getStreamingAvailability(
   title: string,
   year: number,
