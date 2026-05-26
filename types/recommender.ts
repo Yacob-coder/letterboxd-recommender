@@ -18,4 +18,6 @@ export interface Recommendation {
   streamingService: string
   reason: string
   matchScore: number // 1-10
+  posterUrl: string | null
+  communityRating: number | null // TMDB vote_average (0–10)
 }

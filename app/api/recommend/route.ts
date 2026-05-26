@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getCachedWatchlist, getCachedRatings, getCachedDiary } from '@/lib/letterboxd'
 import { getCachedStreamingForFilms } from '@/lib/justwatch'
 import { getRecommendations } from '@/lib/recommender'
+import { getPosterUrl, getMovieRating } from '@/lib/tmdb'
 
 // TODO: Vercel serverless functions default to a 10s timeout. On cold cache
 // (Letterboxd not yet scraped, or JustWatch entries expired after 24h), the
@@ -69,5 +70,15 @@ export async function POST(req: Request) {
     mood,
   })
 
-  return NextResponse.json({ recommendations })
+  const enriched = await Promise.all(
+    recommendations.map(async (rec) => {
+      const [posterUrl, communityRating] = await Promise.all([
+        getPosterUrl(rec.title, rec.year),
+        getMovieRating(rec.title, rec.year),
+      ])
+      return { ...rec, posterUrl, communityRating }
+    }),
+  )
+
+  return NextResponse.json({ recommendations: enriched })
 }
