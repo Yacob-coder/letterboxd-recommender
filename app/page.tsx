@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { STREAMING_SERVICES } from '@/lib/config'
 import type { Recommendation } from '@/types/recommender'
@@ -19,14 +19,41 @@ const GENRES = [
 ]
 
 type Status = 'idle' | 'loading' | 'done' | 'error-cache' | 'error-empty' | 'error-generic'
+type WarmupState = 'warming' | 'ready'
 
 export default function Home() {
   const [selectedGenres, setSelectedGenres] = useState<string[]>([])
   const [status, setStatus] = useState<Status>('idle')
   const [results, setResults] = useState<Recommendation[]>([])
+  const [warmupState, setWarmupState] = useState<WarmupState>('warming')
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    fetch('/api/warmup').catch(() => {})
+    // Kick off letterboxd warmup, then justwatch warmup once letterboxd resolves
+    fetch('/api/warmup/letterboxd')
+      .catch(() => {})
+      .finally(() => {
+        fetch('/api/warmup/justwatch').catch(() => {})
+      })
+
+    // Poll status every 3 seconds until both caches are ready
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch('/api/warmup/status')
+        if (!res.ok) return
+        const data: { letterboxdReady: boolean; justwatchReady: boolean } = await res.json()
+        if (data.letterboxdReady && data.justwatchReady) {
+          setWarmupState('ready')
+          if (pollRef.current) clearInterval(pollRef.current)
+        }
+      } catch {
+        // ignore — keep polling
+      }
+    }, 3000)
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
   }, [])
 
   function toggleGenre(genre: string) {
@@ -74,6 +101,8 @@ export default function Home() {
     }
   }
 
+  const isWarming = warmupState === 'warming'
+
   return (
     <main className="min-h-screen px-4 py-12 max-w-2xl mx-auto">
       {/* Header */}
@@ -108,16 +137,25 @@ export default function Home() {
       {/* CTA button */}
       <button
         onClick={handleFind}
-        disabled={status === 'loading'}
-        className="w-full py-3 rounded-lg font-semibold text-base transition-opacity disabled:opacity-60"
+        disabled={isWarming || status === 'loading'}
+        className="w-full py-3 rounded-lg font-semibold text-base transition-opacity disabled:opacity-50"
         style={{ background: '#e8b84b', color: '#0a0a0a' }}
       >
         Find something to watch
       </button>
 
-      {/* States */}
-      <div className="mt-10">
-        {status === 'loading' && (
+      {/* Warmup / result states */}
+      <div className="mt-8">
+        {isWarming && (
+          <p
+            className="text-center text-sm animate-pulse-gold"
+            style={{ color: '#e8b84b' }}
+          >
+            Getting your watchlist ready...
+          </p>
+        )}
+
+        {!isWarming && status === 'loading' && (
           <p
             className="text-center text-base animate-pulse-gold"
             style={{ color: '#e8b84b' }}
