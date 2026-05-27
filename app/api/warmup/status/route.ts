@@ -20,7 +20,7 @@ export async function GET() {
       .filter((f): f is typeof f & { year: number } => f.year !== null)
       .map((f) => ({ title: f.title, year: f.year, slug: f.slug }))
     const streaming = getCachedStreamingForFilms(lookupFilms)
-    justwatchReady = streaming.size > 0
+    justwatchReady = streaming.size >= 40
   }
 
   return NextResponse.json({ letterboxdReady, justwatchReady })

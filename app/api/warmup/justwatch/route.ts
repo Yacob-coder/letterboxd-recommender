@@ -17,6 +17,7 @@ export async function GET() {
 
   const lookupFilms = watchlist
     .filter((f): f is typeof f & { year: number } => f.year !== null)
+    .slice(0, 50)
     .map((f) => ({ title: f.title, year: f.year, slug: f.slug }))
 
   await getStreamingForFilms(lookupFilms)
