@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const username = process.env.LETTERBOXD_USERNAME
+  console.log('[warmup/letterboxd] start, username present:', !!username)
   if (!username) {
     return NextResponse.json({ error: 'LETTERBOXD_USERNAME not configured' }, { status: 500 })
   }
@@ -15,6 +16,9 @@ export async function GET() {
     fetchDiary(username),
   ])
 
+  console.log(
+    `[warmup/letterboxd] done — watchlist: ${watchlist.length}, ratings: ${ratings.length}, diary: ${diary.length}`,
+  )
   return NextResponse.json({
     watchlist: watchlist.length,
     ratings: ratings.length,
