@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { Recommendation, RecommendationInput } from '@/types/recommender'
-import { CLAUDE_MODEL, MINIMUM_LETTERBOXD_RATING } from '@/lib/config'
+import { CLAUDE_MODEL } from '@/lib/config'
 
 const client = new Anthropic()
 
@@ -99,11 +99,9 @@ export async function getRecommendations(input: RecommendationInput): Promise<Re
 
   const diarySlugs = new Set(diary.map((d) => d.slug).filter(Boolean))
   const ratingSlugs = new Set(ratings.map((r) => r.slug).filter(Boolean))
-  const lowRatedSlugs = new Set(
-    ratings
-      .filter((r) => r.rating !== null && r.rating <= MINIMUM_LETTERBOXD_RATING)
-      .map((r) => r.slug)
-      .filter(Boolean),
+
+  console.log(
+    `Recommender: input — watchlist: ${watchlist.length}, ratings: ${ratings.length}, diary: ${diary.length}, streamingAvailability: ${streamingAvailability.size} films, selectedServices: [${selectedServices.join(', ')}]`,
   )
 
   const selectedServicesSet = new Set(selectedServices)
@@ -115,10 +113,15 @@ export async function getRecommendations(input: RecommendationInput): Promise<Re
     services: string[]
   }> = []
 
+  let afterDiary = 0
+  let afterRatings = 0
+  let afterStreaming = 0
+
   for (const film of watchlist) {
     if (diarySlugs.has(film.slug)) continue
+    afterDiary++
     if (ratingSlugs.has(film.slug)) continue
-    if (lowRatedSlugs.has(film.slug)) continue
+    afterRatings++
 
     const offers = streamingAvailability.get(film.slug) ?? []
     const services = Array.from(
@@ -131,11 +134,17 @@ export async function getRecommendations(input: RecommendationInput): Promise<Re
     )
 
     if (services.length === 0) continue
+    afterStreaming++
 
     filtered.push({ title: film.title, year: film.year, slug: film.slug, services })
   }
 
+  console.log(
+    `Recommender: filter pipeline — after diary exclude: ${afterDiary}, after ratings exclude: ${afterRatings}, after streaming filter: ${afterStreaming}`,
+  )
+
   const cappedWatchlist = filtered.slice(0, 100)
+  console.log(`Recommender: candidates after cap: ${cappedWatchlist.length}`)
 
   if (cappedWatchlist.length === 0) {
     console.warn('Recommender: no streamable watchlist candidates after filtering')
@@ -147,6 +156,8 @@ export async function getRecommendations(input: RecommendationInput): Promise<Re
     .sort((a, b) => b.rating - a.rating)
     .slice(0, 50)
     .map((r) => ({ title: r.title, year: r.year, rating: r.rating }))
+
+  console.log(`Recommender: taste signal — ${topRated.length} rated films`)
 
   if (topRated.length === 0) {
     console.warn('Recommender: no rated films to derive taste signal from')
@@ -162,6 +173,7 @@ export async function getRecommendations(input: RecommendationInput): Promise<Re
 
   let responseText = ''
   try {
+    console.log('Recommender: calling Claude API...')
     const response = await client.messages.create({
       model: CLAUDE_MODEL,
       max_tokens: 4096,
@@ -169,10 +181,13 @@ export async function getRecommendations(input: RecommendationInput): Promise<Re
     })
     const first = response.content[0]
     responseText = first?.type === 'text' ? first.text : ''
+    console.log('Recommender: raw Claude response:', responseText)
   } catch (err) {
     console.error('Recommender: Anthropic API call failed:', err)
     return []
   }
 
-  return parseRecommendations(responseText)
+  const results = parseRecommendations(responseText)
+  console.log(`Recommender: parsed ${results.length} recommendations`)
+  return results
 }
